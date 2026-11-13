@@ -1,0 +1,22 @@
+# PostgreSQL para el proyecto Orígenes SV.
+# Uso: docker compose up -d      (desde la raíz del proyecto)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: origenes-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-Admin123!}
+    ports:
+      - "${DB_PORT:-5433}:5432"      # puerto 5433 para no chocar con otros Postgres en 5432
+    volumes:
+      - origenes_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  origenes_pgdata:
