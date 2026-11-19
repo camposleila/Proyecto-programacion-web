@@ -32,7 +32,7 @@ CREATE TABLE empleado (
     numero_afp       VARCHAR(20),
     cargo            VARCHAR(50) NOT NULL,
     salario_mensual  NUMERIC(12,2) NOT NULL CHECK (salario_mensual >= 0),
-    fecha_ingreso    DATE NOT NULL,
+    fecha_ingreso    DATE NOT NULL DEFAULT CURRENT_DATE,
     activo           BOOLEAN NOT NULL DEFAULT TRUE
 );
 
