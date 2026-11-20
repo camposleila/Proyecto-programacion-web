@@ -7,6 +7,7 @@ const { Pool } = pg;
 // para que la API devuelva 3.5 y no "3.50" (si no, el frontend concatena en lugar de sumar).
 pg.types.setTypeParser(1700, (valor) => parseFloat(valor)); // NUMERIC / DECIMAL
 pg.types.setTypeParser(20, (valor) => parseInt(valor, 10)); // BIGINT
+pg.types.setTypeParser(1082, (valor) => valor);              // DATE -> se queda como 'AAAA-MM-DD'
 
 // Un solo pool de conexiones compartido por todo el backend
 export const pool = new Pool({
