@@ -1,11 +1,22 @@
 import { Router } from 'express';
 import { health } from '../controllers/controllers.js';
-import {permitirRoles, verificarToken} from '../middleware/auth.js'
+import authRoutes from './auth.routes.js';
+import sucursalesRoutes from './sucursales.routes.js';
+import rolesRoutes from './roles.routes.js';
+import empleadosRoutes from './empleados.routes.js';
+import usuariosRoutes from './usuarios.routes.js';
 
 const router = Router();
 
+
 // Prueba de conexión: GET /api/health
 router.get('/health', health);
+router.use('/auth', authRoutes);
+router.use('/sucursales', sucursalesRoutes);
+router.use('/roles', rolesRoutes);
+router.use('/empleados', empleadosRoutes);
+router.use('/usuarios', usuariosRoutes);
+
 
 // Cada integrante registra aquí las rutas de su modulo, en su propio archivo:
 // import ventasRoutes from './ventas.routes.js';
