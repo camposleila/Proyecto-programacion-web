@@ -31,8 +31,6 @@ router.use('/insumos', insumosRoutes);
 router.use('/productos', productosRoutes);
 router.use('/inventario', inventarioRoutes);
 
-
-
 import clientesRoutes from './clientes.routes.js';
 import ventasRoutes from './ventas.routes.js';
 // ...
