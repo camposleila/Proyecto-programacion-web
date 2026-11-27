@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
-import { requerirPermiso } from '../middleware/permisos.js';
+import { verificarToken, permitirRoles } from '../middleware/auth.js';
 
 const router = Router();
+router.use(verificarToken);
 
 const METODOS_PAGO = ['EFECTIVO', 'TARJETA', 'BITCOIN', 'CHIVO'];
 
@@ -55,7 +56,7 @@ async function calcularMontosEsperados(client, turno) {
     return esperados;
 }
 
-router.get('/actual', requerirPermiso('operar_caja'), async (req, res) => {
+router.get('/actual', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
     try {
         const resultado = await pool.query(
             `SELECT tc.*, c.nombre AS nombre_caja, c.id_sucursal
@@ -64,24 +65,24 @@ router.get('/actual', requerirPermiso('operar_caja'), async (req, res) => {
              WHERE tc.id_usuario = $1 AND tc.estado = 'ABIERTO'
              ORDER BY tc.fecha_apertura DESC
              LIMIT 1`,
-            [req.auth.usuario.id_usuario]
+            [req.usuario.id_usuario]
         );
 
         const turno = resultado.rows[0] ?? null;
         return res.json({ turno });
     } catch (error) {
         console.error('Error al consultar turno abierto:', error);
-        return res.status(500).json({ mensaje: 'No se pudo consultar el turno actual' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo consultar el turno actual' });
     }
 });
 
-
-router.post('/abrir', requerirPermiso('operar_caja'), async (req, res) => {
+router.post('/abrir', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
     const idCaja = validarId(req.body?.id_caja);
     const { monto_apertura } = req.body ?? {};
 
     if (!idCaja || !montoValido(monto_apertura, true)) {
         return res.status(400).json({
+            ok: false,
             mensaje: 'Debe especificar una caja válida y un monto de apertura mayor o igual a 0'
         });
     }
@@ -96,21 +97,21 @@ router.post('/abrir', requerirPermiso('operar_caja'), async (req, res) => {
         );
 
         if (cajaRes.rowCount === 0 || !cajaRes.rows[0].activa) {
-            return res.status(404).json({ mensaje: 'Caja no encontrada o sucursal inactiva' });
+            return res.status(404).json({ ok: false, mensaje: 'Caja no encontrada o sucursal inactiva' });
         }
 
-        const sucursalUsuario = req.auth.usuario.id_sucursal;
+        const sucursalUsuario = req.usuario.id_sucursal;
         if (
             sucursalUsuario &&
             sucursalUsuario !== cajaRes.rows[0].id_sucursal &&
-            !req.auth.permisos?.has('gestionar_sucursales')
+            req.usuario.rol !== 'Administrador'
         ) {
             return res.status(403).json({
+                ok: false,
                 mensaje: 'No tienes permiso para abrir cajas en otra sucursal'
             });
         }
 
-        //hacemos una validacion para asegurarnos que no exista una ya abierta
         const turnoExistente = await pool.query(
             `SELECT id_turno FROM turno_caja WHERE id_caja = $1 AND estado = 'ABIERTO'`,
             [idCaja]
@@ -118,43 +119,44 @@ router.post('/abrir', requerirPermiso('operar_caja'), async (req, res) => {
 
         if (turnoExistente.rowCount > 0) {
             return res.status(409).json({
+                ok: false,
                 mensaje: 'Ya existe un turno abierto para esta caja'
             });
         }
 
-        //insertamos un turno
         const resultado = await pool.query(
             `INSERT INTO turno_caja (id_caja, id_usuario, monto_apertura, estado)
              VALUES ($1, $2, $3, 'ABIERTO')
              RETURNING *`,
             [
                 idCaja,
-                req.auth.usuario.id_usuario,
+                req.usuario.id_usuario,
                 redondearMoneda(monto_apertura)
             ]
         );
 
         return res.status(201).json({
+            ok: true,
             mensaje: 'Turno de caja abierto exitosamente',
             turno: resultado.rows[0]
         });
     } catch (error) {
-        
         if (error.code === '23505') {
             return res.status(409).json({
+                ok: false,
                 mensaje: 'Ya existe un turno abierto para esta caja'
             });
         }
 
         console.error('Error al abrir turno:', error);
-        return res.status(500).json({ mensaje: 'No se pudo abrir el turno de caja' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo abrir el turno de caja' });
     }
 });
 
-router.get('/:id/cuadre', requerirPermiso('operar_caja'), async (req, res) => {
+router.get('/:id/cuadre', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
     const idTurno = validarId(req.params.id);
     if (!idTurno) {
-        return res.status(400).json({ mensaje: 'ID de turno inválido' });
+        return res.status(400).json({ ok: false, mensaje: 'ID de turno inválido' });
     }
 
     try {
@@ -169,7 +171,7 @@ router.get('/:id/cuadre', requerirPermiso('operar_caja'), async (req, res) => {
 
         const turno = turnoRes.rows[0];
         if (!turno) {
-            return res.status(404).json({ mensaje: 'Turno no encontrado' });
+            return res.status(404).json({ ok: false, mensaje: 'Turno no encontrado' });
         }
 
         if (turno.estado === 'CERRADO') {
@@ -201,27 +203,27 @@ router.get('/:id/cuadre', requerirPermiso('operar_caja'), async (req, res) => {
         });
     } catch (error) {
         console.error('Error al obtener cuadre de turno:', error);
-        return res.status(500).json({ mensaje: 'No se pudo obtener el cuadre del turno' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo obtener el cuadre del turno' });
     }
 });
 
-
-router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
+router.post('/:id/cerrar', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
     const idTurno = validarId(req.params.id);
     const { conteos } = req.body ?? {};
 
     if (!idTurno || !Array.isArray(conteos)) {
         return res.status(400).json({
+            ok: false,
             mensaje: 'Debe enviar un ID de turno válido y el arreglo de conteos por método de pago'
         });
     }
 
-    // Validar y mapear los montos contados enviados por el cajero
     const mapaContados = new Map();
     for (const item of conteos) {
         const metodo = String(item?.metodo_pago || '').toUpperCase();
         if (!METODOS_PAGO.includes(metodo) || !montoValido(item?.monto_contado, true)) {
             return res.status(400).json({
+                ok: false,
                 mensaje: `Datos inválidos para el método de pago: ${item?.metodo_pago}`
             });
         }
@@ -240,7 +242,7 @@ router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
              FROM turno_caja
              WHERE id_turno = $1 AND id_usuario = $2 AND estado = 'ABIERTO'
              FOR UPDATE`,
-            [idTurno, req.auth.usuario.id_usuario]
+            [idTurno, req.usuario.id_usuario]
         );
 
         const turno = turnoRes.rows[0];
@@ -248,11 +250,11 @@ router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
             await client.query('ROLLBACK');
             transaccionIniciada = false;
             return res.status(409).json({
+                ok: false,
                 mensaje: 'El turno ya fue cerrado, no existe o pertenece a otro usuario'
             });
         }
 
-        //calculamos lo ganado por cada metodo de pago
         const esperados = await calcularMontosEsperados(client, turno);
 
         const detallesGuardados = [];
@@ -272,7 +274,6 @@ router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
             detallesGuardados.push(insertDetalle.rows[0]);
         }
 
-        // cambiamos el estado de la caja a cerrado
         const turnoCerradoRes = await client.query(
             `UPDATE turno_caja
              SET fecha_cierre = NOW(),
@@ -286,6 +287,7 @@ router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
         transaccionIniciada = false;
 
         return res.json({
+            ok: true,
             mensaje: 'Turno cerrado exitosamente',
             turno: turnoCerradoRes.rows[0],
             detalle: detallesGuardados
@@ -300,7 +302,7 @@ router.post('/:id/cerrar', requerirPermiso('operar_caja'), async (req, res) => {
         }
 
         console.error('Error al cerrar turno:', error);
-        return res.status(500).json({ mensaje: 'No se pudo cerrar el turno de caja' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo cerrar el turno de caja' });
     } finally {
         client.release();
     }

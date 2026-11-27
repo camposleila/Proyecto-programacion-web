@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
-import { requerirPermiso } from '../middleware/permisos.js';
+import { verificarToken, permitirRoles } from '../middleware/auth.js';
 
 const router = Router();
+router.use(verificarToken);
+
 const MAXIMO_DINERO = 99999999.99;
 const CONDICIONES_PAGO = new Set(['CONTADO', 'CREDITO']);
 
@@ -23,13 +25,13 @@ function esFechaValida(valor) {
 }
 
 function leerSucursal(req, valor) {
-    if (req.auth.usuario.id_sucursal) return req.auth.usuario.id_sucursal;
-    if (req.auth.permisos?.has('gestionar_sucursales')) return enteroPositivo(valor);
-    return null;
+    if (req.usuario.rol === 'Administrador') {
+        return enteroPositivo(valor) ?? req.usuario.id_sucursal ?? null;
+    }
+    return req.usuario.id_sucursal ?? null;
 }
 
-
-router.get('/', requerirPermiso('ver_compras'), async (req, res) => {
+router.get('/', permitirRoles('Administrador', 'Gerente'), async (req, res) => {
     const pagina = Number(req.query.pagina ?? 1);
     const limite = Number(req.query.limite ?? 25);
     const sucursalQuery = req.query.id_sucursal ? enteroPositivo(req.query.id_sucursal) : null;
@@ -39,12 +41,13 @@ router.get('/', requerirPermiso('ver_compras'), async (req, res) => {
         !Number.isInteger(limite) || limite < 1 || limite > 100 ||
         (req.query.id_sucursal && !sucursalQuery)
     ) {
-        return res.status(400).json({ mensaje: 'Revisa la paginación y la sucursal' });
+        return res.status(400).json({ ok: false, mensaje: 'Revisa la paginación y la sucursal' });
     }
 
-    const idSucursalFiltro = req.auth.usuario.id_sucursal
-        ? req.auth.usuario.id_sucursal
-        : (req.auth.permisos?.has('gestionar_sucursales') ? sucursalQuery : null);
+    const esAdmin = req.usuario.rol === 'Administrador';
+    const idSucursalFiltro = esAdmin
+        ? (sucursalQuery ?? req.usuario.id_sucursal ?? null)
+        : req.usuario.id_sucursal;
 
     try {
         const params = [];
@@ -88,23 +91,22 @@ router.get('/', requerirPermiso('ver_compras'), async (req, res) => {
         });
     } catch (error) {
         console.error('Error al consultar compras:', error);
-        return res.status(500).json({ mensaje: 'No se pudieron consultar las compras' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudieron consultar las compras' });
     }
 });
 
-
-router.get('/:id', requerirPermiso('ver_compras'), async (req, res) => {
+router.get('/:id', permitirRoles('Administrador', 'Gerente'), async (req, res) => {
     const idCompra = enteroPositivo(req.params.id);
     if (!idCompra) {
-        return res.status(400).json({ mensaje: 'El id de compra no es válido' });
+        return res.status(400).json({ ok: false, mensaje: 'El id de compra no es válido' });
     }
 
     try {
         const params = [idCompra];
         let filtroSucursal = '';
 
-        if (req.auth.usuario.id_sucursal && !req.auth.permisos?.has('gestionar_sucursales')) {
-            params.push(req.auth.usuario.id_sucursal);
+        if (req.usuario.id_sucursal && req.usuario.rol !== 'Administrador') {
+            params.push(req.usuario.id_sucursal);
             filtroSucursal = `AND c.id_sucursal = $2`;
         }
 
@@ -123,7 +125,7 @@ router.get('/:id', requerirPermiso('ver_compras'), async (req, res) => {
 
         const compra = compraRes.rows[0];
         if (!compra) {
-            return res.status(404).json({ mensaje: 'Compra no encontrada' });
+            return res.status(404).json({ ok: false, mensaje: 'Compra no encontrada' });
         }
 
         const [detallesRes, cuentaRes] = await Promise.all([
@@ -162,11 +164,11 @@ router.get('/:id', requerirPermiso('ver_compras'), async (req, res) => {
         });
     } catch (error) {
         console.error('Error al consultar compra:', error);
-        return res.status(500).json({ mensaje: 'No se pudo consultar la compra' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo consultar la compra' });
     }
 });
 
-router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
+router.post('/', permitirRoles('Administrador', 'Gerente'), async (req, res) => {
     const {
         id_proveedor,
         id_sucursal: sucursalSolicitada,
@@ -193,17 +195,19 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
         !Array.isArray(detalles) || detalles.length === 0 || detalles.length > 100 ||
         !Number.isFinite(impuestoEntrada) || impuestoEntrada < 0 || impuesto > MAXIMO_DINERO
     ) {
-        return res.status(400).json({ mensaje: 'Revisa los datos generales de la compra' });
+        return res.status(400).json({ ok: false, mensaje: 'Revisa los datos generales de la compra' });
     }
 
     if (condicion === 'CREDITO' && !esFechaValida(fecha_vencimiento)) {
         return res.status(400).json({
+            ok: false,
             mensaje: 'Las compras a CREDITO requieren una fecha_vencimiento válida (YYYY-MM-DD)'
         });
     }
 
     if (condicion === 'CREDITO' && fecha_vencimiento < fecha_compra) {
         return res.status(400).json({
+            ok: false,
             mensaje: 'La fecha de vencimiento no puede ser anterior a la fecha de compra'
         });
     }
@@ -222,6 +226,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
             insumosPorId.has(idInsumo)
         ) {
             return res.status(400).json({
+                ok: false,
                 mensaje: `El detalle ${indice + 1} no es válido o tiene un insumo duplicado`
             });
         }
@@ -240,7 +245,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
     const total = redondear(subtotal + impuesto);
 
     if (subtotal > MAXIMO_DINERO || total > MAXIMO_DINERO) {
-        return res.status(400).json({ mensaje: 'Los montos superan el límite permitido' });
+        return res.status(400).json({ ok: false, mensaje: 'Los montos superan el límite permitido' });
     }
 
     const client = await pool.connect();
@@ -264,11 +269,11 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
 
         if (provRes.rowCount === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ mensaje: 'El proveedor no existe o está inactivo' });
+            return res.status(404).json({ ok: false, mensaje: 'El proveedor no existe o está inactivo' });
         }
         if (sucRes.rowCount === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ mensaje: 'La sucursal no existe o está inactiva' });
+            return res.status(404).json({ ok: false, mensaje: 'La sucursal no existe o está inactiva' });
         }
 
         const idsInsumos = detallesNormalizados.map((d) => d.id_insumo);
@@ -286,7 +291,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
 
         if (insumosRes.rowCount !== detallesNormalizados.length) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ mensaje: 'Uno o más insumos no existen o están inactivos' });
+            return res.status(400).json({ ok: false, mensaje: 'Uno o más insumos no existen o están inactivos' });
         }
 
         const mapaInsumos = new Map(
@@ -303,7 +308,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
             [
                 idProveedor,
                 idSucursal,
-                req.auth.usuario.id_usuario,
+                req.usuario.id_usuario,
                 numero_documento.trim(),
                 fecha_compra,
                 condicion,
@@ -321,7 +326,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
                 [compraCreada.id_compra, det.id_insumo, det.cantidad, det.costo_unitario]
             );
 
-            //hacemos una suma del inventario de la sucursal
+            // Suma del inventario de la sucursal
             await client.query(
                 `INSERT INTO inventario_sucursal (id_sucursal, id_insumo, existencia)
                  VALUES ($1, $2, $3)
@@ -330,7 +335,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
                 [idSucursal, det.id_insumo, det.cantidad]
             );
 
-            // se vuelve a calcular el costo promedioen insumo
+            // Recalcular costo promedio en insumo
             const infoInsumo = mapaInsumos.get(det.id_insumo);
             const stockAnterior = Number(infoInsumo.existencia_global);
             const costoAnterior = Number(infoInsumo.costo_promedio);
@@ -358,14 +363,14 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
                 [
                     idSucursal,
                     det.id_insumo,
-                    req.auth.usuario.id_usuario,
+                    req.usuario.id_usuario,
                     det.cantidad,
                     compraCreada.id_compra
                 ]
             );
         }
 
-        // 5. Si la compra es a CREDITO, crear la cuenta por pagar
+        // Si la compra es a CREDITO, crear la cuenta por pagar
         let cuentaPorPagar = null;
         if (condicion === 'CREDITO') {
             const cppRes = await client.query(
@@ -383,6 +388,7 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
         transaccionIniciada = false;
 
         return res.status(201).json({
+            ok: true,
             mensaje: 'Compra registrada e inventario actualizado',
             compra: compraCreada,
             cuenta_por_pagar: cuentaPorPagar
@@ -396,15 +402,15 @@ router.post('/', requerirPermiso('registrar_compras'), async (req, res) => {
             }
         }
 
-        // Violación de constraint uq_compra_doc (id_proveedor, numero_documento)
         if (error.code === '23505') {
             return res.status(409).json({
+                ok: false,
                 mensaje: 'Ya existe una compra registrada con ese número de documento para este proveedor'
             });
         }
 
         console.error('Error al registrar compra:', error);
-        return res.status(500).json({ mensaje: 'No se pudo registrar la compra' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo registrar la compra' });
     } finally {
         client.release();
     }
