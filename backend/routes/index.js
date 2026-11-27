@@ -23,7 +23,7 @@ router.use('/sucursales', sucursalesRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/empleados', empleadosRoutes);
 router.use('/usuarios', usuariosRoutes);
-router.use('./turnos', turnosRoutes)
+router.use('/turnos', turnosRoutes)
 router.use('/compras', comprasRouter);
 router.use('/cuentasporpagar', cuentasPorPagarRouter );
 router.use('/categorias', categoriasRoutes);
