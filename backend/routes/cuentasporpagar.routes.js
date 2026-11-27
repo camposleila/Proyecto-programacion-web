@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
-import { requerirPermiso } from '../middleware/permisos.js';
+import { verificarToken, permitirRoles } from '../middleware/auth.js';
 
 const router = Router();
+router.use(verificarToken);
+
 const MAXIMO_DINERO = 99999999.99;
 
 function enteroPositivo(valor) {
@@ -15,19 +17,18 @@ function redondear(valor, decimales = 2) {
     return Math.round((Number(valor) + Number.EPSILON) * factor) / factor;
 }
 
-
-router.get('/', requerirPermiso('ver_compras'), async (req, res) => {
+router.get('/', permitirRoles('Administrador', 'Gerente'), async (req, res) => {
     const estadoFiltro = req.query.estado ? String(req.query.estado).toUpperCase() : null;
     if (estadoFiltro && !['PENDIENTE', 'PARCIAL', 'PAGADA'].includes(estadoFiltro)) {
-        return res.status(400).json({ mensaje: 'Estado de cuenta inválido' });
+        return res.status(400).json({ ok: false, mensaje: 'Estado de cuenta inválido' });
     }
 
     try {
         const params = [];
         const condiciones = [];
 
-        if (req.auth.usuario.id_sucursal && !req.auth.permisos?.has('gestionar_sucursales')) {
-            params.push(req.auth.usuario.id_sucursal);
+        if (req.usuario.id_sucursal && req.usuario.rol !== 'Administrador') {
+            params.push(req.usuario.id_sucursal);
             condiciones.push(`c.id_sucursal = $${params.length}`);
         }
 
@@ -60,12 +61,11 @@ router.get('/', requerirPermiso('ver_compras'), async (req, res) => {
         return res.json({ cuentas: resultado.rows });
     } catch (error) {
         console.error('Error al consultar cuentas por pagar:', error);
-        return res.status(500).json({ mensaje: 'No se pudieron consultar las cuentas por pagar' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudieron consultar las cuentas por pagar' });
     }
 });
 
-
-router.post('/:id/pagos', requerirPermiso('registrar_compras'), async (req, res) => {
+router.post('/:id/pagos', permitirRoles('Administrador', 'Gerente'), async (req, res) => {
     const idCuenta = enteroPositivo(req.params.id);
     const montoEntrada = Number(req.body?.monto);
     const metodoPago = req.body?.metodo_pago;
@@ -76,7 +76,7 @@ router.post('/:id/pagos', requerirPermiso('registrar_compras'), async (req, res)
         !Number.isFinite(montoEntrada) || montoEntrada <= 0 || monto <= 0 || monto > MAXIMO_DINERO ||
         typeof metodoPago !== 'string' || !metodoPago.trim() || metodoPago.length > 15
     ) {
-        return res.status(400).json({ mensaje: 'Revisa el monto y el método de pago' });
+        return res.status(400).json({ ok: false, mensaje: 'Revisa el monto y el método de pago' });
     }
 
     const client = await pool.connect();
@@ -98,27 +98,27 @@ router.post('/:id/pagos', requerirPermiso('registrar_compras'), async (req, res)
         const cuenta = cuentaRes.rows[0];
         if (!cuenta) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ mensaje: 'Cuenta por pagar no encontrada' });
+            return res.status(404).json({ ok: false, mensaje: 'Cuenta por pagar no encontrada' });
         }
 
         if (
-            req.auth.usuario.id_sucursal &&
-            req.auth.usuario.id_sucursal !== cuenta.id_sucursal &&
-            !req.auth.permisos?.has('gestionar_sucursales')
+            req.usuario.id_sucursal &&
+            req.usuario.id_sucursal !== cuenta.id_sucursal &&
+            req.usuario.rol !== 'Administrador'
         ) {
             await client.query('ROLLBACK');
-            return res.status(403).json({ mensaje: 'No tienes permiso sobre esta sucursal' });
+            return res.status(403).json({ ok: false, mensaje: 'No tienes permiso sobre esta sucursal' });
         }
 
         if (cuenta.estado === 'PAGADA' || Number(cuenta.saldo) <= 0) {
             await client.query('ROLLBACK');
-            return res.status(409).json({ mensaje: 'Esta cuenta ya se encuentra pagada' });
+            return res.status(409).json({ ok: false, mensaje: 'Esta cuenta ya se encuentra pagada' });
         }
 
         const saldoActual = redondear(Number(cuenta.saldo));
         if (monto > saldoActual) {
             await client.query('ROLLBACK');
-            return res.status(409).json({ mensaje: 'El monto supera el saldo pendiente' });
+            return res.status(409).json({ ok: false, mensaje: 'El monto supera el saldo pendiente' });
         }
 
         const pagoInsert = await client.query(
@@ -143,6 +143,7 @@ router.post('/:id/pagos', requerirPermiso('registrar_compras'), async (req, res)
         transaccionIniciada = false;
 
         return res.status(201).json({
+            ok: true,
             mensaje: 'Pago a proveedor registrado',
             pago: pagoInsert.rows[0],
             cuenta_por_pagar: cuentaActualizada.rows[0]
@@ -156,7 +157,7 @@ router.post('/:id/pagos', requerirPermiso('registrar_compras'), async (req, res)
             }
         }
         console.error('Error al registrar pago a proveedor:', error);
-        return res.status(500).json({ mensaje: 'No se pudo registrar el pago' });
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo registrar el pago' });
     } finally {
         client.release();
     }
