@@ -8,6 +8,7 @@ import usuariosRoutes from './usuarios.routes.js';
 import categoriasRoutes from './categorias.routes.js';
 import insumosRoutes from './insumos.routes.js';
 import productosRoutes from './productos.routes.js';
+import inventarioRoutes from './inventario.routes.js';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.use('/usuarios', usuariosRoutes);
 router.use('/categorias', categoriasRoutes);
 router.use('/insumos', insumosRoutes);
 router.use('/productos', productosRoutes);
-
+router.use('/inventario', inventarioRoutes);
 
 // Cada integrante registra aquí las rutas de su modulo, en su propio archivo:
 // import ventasRoutes from './ventas.routes.js';
