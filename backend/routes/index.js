@@ -5,7 +5,7 @@ import sucursalesRoutes from './sucursales.routes.js';
 import rolesRoutes from './roles.routes.js';
 import empleadosRoutes from './empleados.routes.js';
 import usuariosRoutes from './usuarios.routes.js';
-import turnosRoutes from './caja.routes.js';
+import turnosRoutes from './turnos.routes.js';
 import comprasRouter from './compras.routes.js';
 import cuentasPorPagarRouter from './cuentasporpagar.routes.js';
 import categoriasRoutes from './categorias.routes.js';
