@@ -32,8 +32,10 @@ router.use('/productos', productosRoutes);
 router.use('/inventario', inventarioRoutes);
 
 
-// Cada integrante registra aquí las rutas de su modulo, en su propio archivo:
-// import ventasRoutes from './ventas.routes.js';
-// router.use('/ventas', ventasRoutes);
 
+import clientesRoutes from './clientes.routes.js';
+import ventasRoutes from './ventas.routes.js';
+// ...
+router.use('/clientes', clientesRoutes);
+router.use('/ventas', ventasRoutes);
 export default router;
