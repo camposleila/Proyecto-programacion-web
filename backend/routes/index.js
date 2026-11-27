@@ -5,6 +5,7 @@ import sucursalesRoutes from './sucursales.routes.js';
 import rolesRoutes from './roles.routes.js';
 import empleadosRoutes from './empleados.routes.js';
 import usuariosRoutes from './usuarios.routes.js';
+import categoriasRoutes from './categorias.routes.js';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.use('/sucursales', sucursalesRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/empleados', empleadosRoutes);
 router.use('/usuarios', usuariosRoutes);
+router.use('/categorias', categoriasRoutes);
 
 
 // Cada integrante registra aquí las rutas de su modulo, en su propio archivo:
