@@ -207,6 +207,8 @@ CREATE TABLE cliente (
     nombre           VARCHAR(150) NOT NULL,
     nit              VARCHAR(17),
     nrc              VARCHAR(15),
+    dui              VARCHAR(10),
+    email            VARCHAR(120),
     giro             VARCHAR(150),
     direccion        VARCHAR(250),
     es_contribuyente BOOLEAN NOT NULL DEFAULT FALSE
@@ -231,6 +233,7 @@ CREATE TABLE venta (
     serie             VARCHAR(10) NOT NULL,
     numero_documento  INT NOT NULL,
     fecha             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    descuento         NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (descuento >= 0),
     subtotal          NUMERIC(12,2) NOT NULL,
     iva               NUMERIC(12,2) NOT NULL,
     total             NUMERIC(12,2) NOT NULL,
