@@ -34,6 +34,7 @@ La primera vez descarga la imagen (unos 100 MB). Se crea el contenedor `origenes
 cd backend
 npm install
 npm run db:setup
+npm run db:admin
 ```
 
 `db:setup` crea el usuario `origenes_app`, la base `origenes_sv`, las 28 tablas, la vista y los datos semilla.
