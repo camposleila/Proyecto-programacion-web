@@ -1,0 +1,7 @@
+[
+  { "id_producto": 1, "nombre": "Latte Grande", "id_categoria": 1, "tipo_producto": "ELABORADO", "precio_venta": 3.5 },
+  { "id_producto": 2, "nombre": "Espresso", "id_categoria": 1, "tipo_producto": "ELABORADO", "precio_venta": 1.75 },
+  { "id_producto": 3, "nombre": "Frappé Moka", "id_categoria": 2, "tipo_producto": "ELABORADO", "precio_venta": 4.25 },
+  { "id_producto": 4, "nombre": "Croissant", "id_categoria": 3, "tipo_producto": "ELABORADO", "precio_venta": 2 },
+  { "id_producto": 5, "nombre": "Agua embotellada", "id_categoria": 4, "tipo_producto": "REVENTA", "precio_venta": 1 }
+]
