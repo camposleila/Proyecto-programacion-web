@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-crema text-marino font-sans antialiased; }
+
+@layer components {
+  .campo {
+    @apply w-full rounded-xl border border-oliva/40 bg-crema px-4 py-2.5 text-sm shadow-sm
+           placeholder:italic placeholder:text-oliva focus:border-marino focus:outline-none focus:ring-2 focus:ring-celeste;
+  }
+  .campo:disabled { @apply bg-oliva/10 text-oliva cursor-not-allowed; }
+  .campo-error { @apply border-red-600 focus:border-red-600 focus:ring-red-200; }
+  .etiqueta { @apply mb-1 block text-sm font-medium; }
+  .btn-oscuro { @apply rounded-xl bg-marino px-4 py-2 text-sm font-semibold text-crema hover:bg-marino/90 transition; }
+  .btn-claro  { @apply rounded-xl border border-oliva/50 bg-crema px-4 py-2 text-sm font-semibold hover:bg-oliva/10 transition; }
+}
