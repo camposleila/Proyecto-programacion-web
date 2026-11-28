@@ -22,7 +22,7 @@ export default function InventarioPage() {
   const [pestana, setPestana] = useState('productos');
   const [productos, setProductos] = useState([]);
   const [busqueda, setBusqueda] = useState('');
-  const [estado, setEstado] = useState('todos');
+  const [estado, setEstado] = useState('activos');
   const [pagina, setPagina] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -78,7 +78,7 @@ export default function InventarioPage() {
       await eliminarProducto(productoBaja.id_producto);
 
       setProductoBaja(null);
-      setMensaje('Producto dado de baja correctamente.');
+      setMensaje('Producto eliminado correctamente.');
 
       await cargarProductos();
 
@@ -203,17 +203,15 @@ export default function InventarioPage() {
             <Pencil size={18} />
           </button>
 
-          {producto.activo && (
-            <button
-              type="button"
-              className="rounded-lg p-2 text-red-600 hover:bg-red-100"
-              title="Dar de baja"
-              aria-label={`Dar de baja ${producto.nombre}`}
-              onClick={() => darDeBaja(producto)}
-            >
-              <Trash2 size={18} />
-            </button>
-          )}
+          <button
+            type="button"
+            className="rounded-lg p-2 text-red-600 hover:bg-red-100"
+            title="Eliminar producto"
+            aria-label={`Eliminar ${producto.nombre}`}
+            onClick={() => darDeBaja(producto)}
+          >
+            <Trash2 size={18} />
+          </button>
 
         </div>
       ) : '—'
@@ -423,13 +421,14 @@ export default function InventarioPage() {
         />
       )}
 
+
       {productoBaja && puedeEditar && (
         <ModalConfirmacion
           abierto={true}
-          titulo="¿Dar de baja el producto?"
-          mensaje={`Estás a punto de dar de baja ${productoBaja.nombre}.`}
-          descripcion="El producto dejará de aparecer en el catálogo de ventas. Podrás reactivarlo posteriormente desde inventario."
-          textoConfirmar="Dar de baja"
+          titulo="¿Eliminar el producto?"
+          mensaje={`Estás a punto de eliminar ${productoBaja.nombre}.`}
+          descripcion="El producto y su receta serán eliminados permanentemente. Esta acción no se puede deshacer."
+          textoConfirmar="Eliminar"
           procesando={procesandoBaja}
           onConfirmar={confirmarBaja}
           onCancelar={() => setProductoBaja(null)}
