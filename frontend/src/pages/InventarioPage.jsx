@@ -8,6 +8,7 @@ import CampoFormulario from '../components/ui/CampoFormulario.jsx';
 import { useSearchParams } from 'react-router-dom';
 import FormularioProducto from '../components/inventario/FormularioProducto.jsx';
 import { getUsuario } from '../utils/sesion';
+import TablaMovimientos from '../components/inventario/TablaMovimientos.jsx';
 import {
   listarProductosInventario,
   eliminarProducto
@@ -395,15 +396,8 @@ export default function InventarioPage() {
 )}
 
       {pestana === 'movimientos' && (
-        <section className="rounded-xl border border-oliva/30 p-8">
-          <h2 className="text-xl font-bold">
-            Movimientos de inventario
-          </h2>
-          <p className="mt-2 text-oliva">
-            Módulo en desarrollo.
-          </p>
-        </section>
-      )}
+  <TablaMovimientos />
+)}
       {modalAbierto && puedeEditar && (
         <FormularioProducto
           key={productoSeleccionado ?? 'nuevo'}

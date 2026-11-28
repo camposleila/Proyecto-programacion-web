@@ -32,11 +32,18 @@ export async function listarExistencias(idSucursal = '') {
 
 // Consulta del historial de movimientos
 
-export async function listarMovimientos(idSucursal = '') {
+export async function listarMovimientos(
+  idSucursal = '',
+  tipoMovimiento = ''
+) {
   const parametros = new URLSearchParams();
 
   if (idSucursal) {
     parametros.set('id_sucursal', idSucursal);
+  }
+
+  if (tipoMovimiento) {
+    parametros.set('tipo_movimiento', tipoMovimiento);
   }
 
   const respuesta = await api.get(
