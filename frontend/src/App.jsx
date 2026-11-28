@@ -6,6 +6,7 @@ import CatalogoPage from './pages/CatalogoPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
 import DocumentoPage from './pages/DocumentoPage.jsx';
 import ProximamentePage from './pages/ProximamentePage.jsx';
+import InventarioPage from './pages/InventarioPage.jsx';
 
 // ─────────────────────────────────────────────────────────────
 // Tabla de rutas. Cada pareja reemplaza SOLO su <ProximamentePage />
@@ -28,7 +29,7 @@ export default function App() {
           {/* Resto del equipo */}
           <Route path="/resumen" element={<RutaProtegida ruta="/resumen"><ProximamentePage nombre="Resumen" responsable="Frontend 2" /></RutaProtegida>} />
           <Route path="/ventas" element={<RutaProtegida ruta="/ventas"><ProximamentePage nombre="Ventas" responsable="Frontend 1 (historial)" /></RutaProtegida>} />
-          <Route path="/inventario" element={<RutaProtegida ruta="/inventario"><ProximamentePage nombre="Inventario" responsable="Frontend 2" /></RutaProtegida>} />
+          <Route path="/inventario" element={<RutaProtegida ruta="/inventario"><InventarioPage /></RutaProtegida>}/>
           <Route path="/compras" element={<RutaProtegida ruta="/compras"><ProximamentePage nombre="Compras" responsable="Frontend 3" /></RutaProtegida>} />
           <Route path="/caja" element={<RutaProtegida ruta="/caja"><ProximamentePage nombre="Caja" responsable="Frontend 3" /></RutaProtegida>} />
           <Route path="/personal" element={<RutaProtegida ruta="/personal"><ProximamentePage nombre="Personal" responsable="Frontend 4" /></RutaProtegida>} />
