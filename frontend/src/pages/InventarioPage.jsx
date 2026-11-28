@@ -9,6 +9,7 @@ import { useSearchParams } from 'react-router-dom';
 import FormularioProducto from '../components/inventario/FormularioProducto.jsx';
 import { getUsuario } from '../utils/sesion';
 import TablaMovimientos from '../components/inventario/TablaMovimientos.jsx';
+import ModalConfirmacion from '../components/ui/ModalConfirmacion.jsx';
 import {
   listarProductosInventario,
   eliminarProducto
@@ -28,6 +29,8 @@ export default function InventarioPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [mensaje, setMensaje] = useState('');
+  const [productoBaja, setProductoBaja] = useState(null);
+  const [procesandoBaja, setProcesandoBaja] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const puedeEditar = ['Administrador', 'Gerente']
@@ -59,21 +62,34 @@ export default function InventarioPage() {
     await cargarProductos();
   }
 
-  async function darDeBaja(producto) {
-    const confirmar = window.confirm(
-      `¿Deseás dar de baja ${producto.nombre}?`
-    );
 
-    if (!confirmar) return;
+  function darDeBaja(producto) {
+    setProductoBaja(producto);
+  }
+
+  async function confirmarBaja() {
+    if (!productoBaja || procesandoBaja) return;
 
     try {
-      await eliminarProducto(producto.id_producto);
+      setProcesandoBaja(true);
+      setError('');
+      setMensaje('');
+
+      await eliminarProducto(productoBaja.id_producto);
+
+      setProductoBaja(null);
       setMensaje('Producto dado de baja correctamente.');
+
       await cargarProductos();
+
     } catch (err) {
+      setProductoBaja(null);
       setError(err.message);
+    } finally {
+      setProcesandoBaja(false);
     }
   }
+
   async function cargarProductos() {
     try {
       setCargando(true);
@@ -392,12 +408,12 @@ export default function InventarioPage() {
       )}
 
       {pestana === 'existencias' && (
-  <TablaExistencias />
-)}
+        <TablaExistencias />
+      )}
 
       {pestana === 'movimientos' && (
-  <TablaMovimientos />
-)}
+        <TablaMovimientos />
+      )}
       {modalAbierto && puedeEditar && (
         <FormularioProducto
           key={productoSeleccionado ?? 'nuevo'}
@@ -406,6 +422,20 @@ export default function InventarioPage() {
           onGuardado={productoGuardado}
         />
       )}
+
+      {productoBaja && puedeEditar && (
+        <ModalConfirmacion
+          abierto={true}
+          titulo="¿Dar de baja el producto?"
+          mensaje={`Estás a punto de dar de baja ${productoBaja.nombre}.`}
+          descripcion="El producto dejará de aparecer en el catálogo de ventas. Podrás reactivarlo posteriormente desde inventario."
+          textoConfirmar="Dar de baja"
+          procesando={procesandoBaja}
+          onConfirmar={confirmarBaja}
+          onCancelar={() => setProductoBaja(null)}
+        />
+      )}
+
     </div>
   );
 }
