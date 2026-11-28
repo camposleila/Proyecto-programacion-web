@@ -8,6 +8,8 @@ import DocumentoPage from './pages/DocumentoPage.jsx';
 import ProximamentePage from './pages/ProximamentePage.jsx';
 import InventarioPage from './pages/InventarioPage.jsx';
 import ResumenPage from './pages/ResumenPage.jsx';
+import ComprasPage from './pages/ComprasPage.jsx';
+import CajaPage from './pages/CajaPage.jsx';
 
 // ─────────────────────────────────────────────────────────────
 // Tabla de rutas. Cada pareja reemplaza SOLO su <ProximamentePage />
@@ -27,12 +29,16 @@ export default function App() {
           <Route path="/checkout" element={<RutaProtegida ruta="/catalogo"><CheckoutPage /></RutaProtegida>} />
           <Route path="/documento/:id" element={<RutaProtegida ruta="/documento"><DocumentoPage /></RutaProtegida>} />
 
+          {/* Frontend 2: Resumen e Inventario */}
+          <Route path="/resumen" element={<RutaProtegida ruta="/resumen"><ResumenPage /></RutaProtegida>} />
+          <Route path="/inventario" element={<RutaProtegida ruta="/inventario"><InventarioPage /></RutaProtegida>} />
+
+          {/* Frontend 3: Compras y Caja */}
+          <Route path="/compras" element={<RutaProtegida ruta="/compras"><ComprasPage /></RutaProtegida>} />
+          <Route path="/caja" element={<RutaProtegida ruta="/caja"><CajaPage /></RutaProtegida>} />
+
           {/* Resto del equipo */}
-          <Route path="/resumen" element={<RutaProtegida ruta="/resumen"><ResumenPage /></RutaProtegida>}/>
           <Route path="/ventas" element={<RutaProtegida ruta="/ventas"><ProximamentePage nombre="Ventas" responsable="Frontend 1 (historial)" /></RutaProtegida>} />
-          <Route path="/inventario" element={<RutaProtegida ruta="/inventario"><InventarioPage /></RutaProtegida>}/>
-          <Route path="/compras" element={<RutaProtegida ruta="/compras"><ProximamentePage nombre="Compras" responsable="Frontend 3" /></RutaProtegida>} />
-          <Route path="/caja" element={<RutaProtegida ruta="/caja"><ProximamentePage nombre="Caja" responsable="Frontend 3" /></RutaProtegida>} />
           <Route path="/personal" element={<RutaProtegida ruta="/personal"><ProximamentePage nombre="Personal" responsable="Frontend 4" /></RutaProtegida>} />
           <Route path="*" element={<ProximamentePage nombre="Página no encontrada" />} />
         </Route>
