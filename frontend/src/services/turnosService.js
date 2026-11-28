@@ -9,3 +9,32 @@ export async function obtenerTurnoActual() {
   }
   return turno;
 }
+
+export async function listarCajasDisponibles() {
+  const respuesta = await api.get('/turnos/cajas');
+  return respuesta?.cajas ?? [];
+}
+
+export async function abrirTurno({ id_caja, monto_apertura }) {
+  return api.post('/turnos/abrir', {
+    id_caja: Number(id_caja),
+    monto_apertura: Number(monto_apertura)
+  });
+}
+
+export async function obtenerCuadreTurno(idTurno) {
+  return api.get(`/turnos/${idTurno}/cuadre`);
+}
+
+export async function cerrarTurno(idTurno, conteos) {
+  // conteos: [{ metodo_pago: 'EFECTIVO' | 'TARJETA' | 'BITCOIN' | 'CHIVO', monto_contado: number }]
+  return api.post(`/turnos/${idTurno}/cerrar`, { conteos });
+}
+
+export async function listarHistorialTurnos({ id_sucursal } = {}) {
+  const params = new URLSearchParams();
+  if (id_sucursal) params.set('id_sucursal', String(id_sucursal));
+  const query = params.toString();
+  const respuesta = await api.get(`/turnos${query ? `?${query}` : ''}`);
+  return respuesta?.turnos ?? [];
+}
