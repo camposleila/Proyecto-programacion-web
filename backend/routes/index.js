@@ -5,7 +5,7 @@ import sucursalesRoutes from './sucursales.routes.js';
 import rolesRoutes from './roles.routes.js';
 import empleadosRoutes from './empleados.routes.js';
 import usuariosRoutes from './usuarios.routes.js';
-import turnosRoutes from './caja.routes.js';
+import turnosRoutes from './turnos.routes.js';
 import comprasRouter from './compras.routes.js';
 import cuentasPorPagarRouter from './cuentasporpagar.routes.js';
 import categoriasRoutes from './categorias.routes.js';
@@ -13,6 +13,11 @@ import insumosRoutes from './insumos.routes.js';
 import productosRoutes from './productos.routes.js';
 import inventarioRoutes from './inventario.routes.js';
 import proveedoresRoutes from './proveedores.routes.js';
+import planillasRoutes from './planillas.routes.js';
+import parametrosLegalesRoutes from './parametros-legales.routes.js';
+import tramosRentaRoutes from './tramos-renta.routes.js';
+import clientesRoutes from './clientes.routes.js';
+import ventasRoutes from './ventas.routes.js';
 
 
 const router = Router();
@@ -24,7 +29,7 @@ router.use('/sucursales', sucursalesRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/empleados', empleadosRoutes);
 router.use('/usuarios', usuariosRoutes);
-router.use('./turnos', turnosRoutes)
+router.use('/turnos', turnosRoutes)
 router.use('/compras', comprasRouter);
 router.use('/cuentasporpagar', cuentasPorPagarRouter );
 router.use('/categorias', categoriasRoutes);
@@ -37,5 +42,12 @@ router.use('/proveedores', proveedoresRoutes);
 // Cada integrante registra aquí las rutas de su modulo, en su propio archivo:
 // import ventasRoutes from './ventas.routes.js';
 // router.use('/ventas', ventasRoutes);
+
+
+router.use('/planillas', planillasRoutes);
+router.use('/parametros-legales', parametrosLegalesRoutes);
+router.use('/tramos-renta', tramosRentaRoutes);
+router.use('/clientes', clientesRoutes);
+router.use('/ventas', ventasRoutes);
 
 export default router;

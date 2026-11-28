@@ -38,31 +38,43 @@ function validarProducto(body, { esActualizacion = false } = {}) {
 
   const { nombre, id_categoria, tipo_producto, precio_venta, activo, receta } = body;
 
+  if (!esActualizacion || tipo_producto !== undefined) {
     if (typeof tipo_producto !== 'string' || !textoValido(tipo_producto)) {
-    return 'tipo_producto es obligatorio y debe ser texto válido';
+      return 'tipo_producto es obligatorio y debe ser texto válido';
+    }
   }
 
-  if (typeof nombre !== 'string' || !textoValido(nombre)) {
-    return 'El nombre del producto es obligatorio y debe ser texto válido';
+  if (!esActualizacion || nombre !== undefined) {
+    if (typeof nombre !== 'string' || !textoValido(nombre)) {
+      return 'El nombre del producto es obligatorio y debe ser texto válido';
+    }
+
+    if (nombre.trim().length > MAX_NOMBRE) {
+      return `El nombre del producto no puede exceder los ${MAX_NOMBRE} caracteres`;
+    }
   }
 
-  if (nombre.trim().length > MAX_NOMBRE) {
-    return `El nombre del producto no puede exceder los ${MAX_NOMBRE} caracteres`;
+  if (!esActualizacion || id_categoria !== undefined) {
+    if (!esIdValido(id_categoria)) {
+      return 'id_categoria es obligatorio y debe ser un número entero positivo';
+    }
   }
 
-  if (!esIdValido(id_categoria)) {
-    return 'id_categoria es obligatorio y debe ser un número entero positivo';
-  }
-
-  if (!esNumeroNoNegativo(precio_venta)) {
-    return 'precio_venta es obligatorio y debe ser un número mayor o igual a 0';
+  if (!esActualizacion || precio_venta !== undefined) {
+    if (!esNumeroNoNegativo(precio_venta)) {
+      return 'precio_venta es obligatorio y debe ser un número mayor o igual a 0';
+    }
   }
 
   if (esActualizacion && activo !== undefined && typeof activo !== 'boolean') {
     return 'activo debe ser un valor booleano';
   }
 
-  if (receta !== undefined) {
+  if (!esActualizacion || receta !== undefined) {
+    if (!Array.isArray(receta) || receta.length === 0) {
+      return 'Todo producto debe tener al menos un insumo en su receta';
+    }
+
     const errorReceta = validarReceta(receta);
     if (errorReceta) return errorReceta;
   }
@@ -146,14 +158,14 @@ export async function listarProductos(req, res, next) {
     const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
 
     const resultado = await query(
-      `SELECT p.id_producto, p.id_categoria, c.nombre AS categoria,
-              p.nombre, p.precio_venta, p.activo
-       FROM producto p
-       JOIN categoria c ON c.id_categoria = p.id_categoria
-       ${where}
-       ORDER BY p.nombre ASC`,
-      valores
-    );
+  `SELECT p.id_producto, p.id_categoria, c.nombre AS categoria,
+          p.tipo_producto, p.nombre, p.precio_venta, p.activo
+   FROM producto p
+   JOIN categoria c ON c.id_categoria = p.id_categoria
+   ${where}
+   ORDER BY p.nombre ASC`,
+  valores
+);
 
     res.json({ ok: true, data: resultado.rows });
   } catch (err) {
@@ -170,13 +182,13 @@ export async function obtenerProducto(req, res, next) {
     }
 
     const resultado = await query(
-      `SELECT p.id_producto, p.id_categoria, c.nombre AS categoria,
-              p.nombre, p.precio_venta, p.activo
-       FROM producto p
-       JOIN categoria c ON c.id_categoria = p.id_categoria
-       WHERE p.id_producto = $1`,
-      [Number(id)]
-    );
+  `SELECT p.id_producto, p.id_categoria, c.nombre AS categoria,
+          p.tipo_producto, p.nombre, p.precio_venta, p.activo
+   FROM producto p
+   JOIN categoria c ON c.id_categoria = p.id_categoria
+   WHERE p.id_producto = $1`,
+  [Number(id)]
+);
 
     if (resultado.rows.length === 0) {
       return res.status(404).json({ ok: false, mensaje: 'Producto no encontrado' });
@@ -206,19 +218,16 @@ export async function crearProducto(req, res, next) {
 
     const { nombre, id_categoria, tipo_producto, precio_venta, receta } = req.body;
 
-  const creado = await withTransaction(async (client) => {
-  const resProd = await client.query(
-    `INSERT INTO producto (id_categoria, tipo_producto, nombre, precio_venta)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [Number(id_categoria), tipo_producto.trim(), nombre.trim(), precio_venta]
-    );
+    const creado = await withTransaction(async (client) => {
+      const resProd = await client.query(
+        `INSERT INTO producto (id_categoria, tipo_producto, nombre, precio_venta)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [Number(id_categoria), tipo_producto.trim(), nombre.trim(), precio_venta]
+      );
 
-    const producto = resProd.rows[0];
-
-      if (Array.isArray(receta) && receta.length > 0) {
-        await guardarReceta(client, producto.id_producto, receta);
-      }
+      const producto = resProd.rows[0];
+      await guardarReceta(client, producto.id_producto, receta);
 
       return producto;
     });
@@ -242,7 +251,7 @@ export async function actualizarProducto(req, res, next) {
   try {
     const { id } = req.params;
     if (!esIdValido(id)) {
-      return res.status(400).json({ ok: false, mensaje: 'El id debe ser un número válido' });
+      return res.status(400).json({ ok: false, mensaje: 'El id del producto debe ser un número entero positivo' });
     }
 
     const error = validarProducto(req.body, { esActualizacion: true });
@@ -250,74 +259,169 @@ export async function actualizarProducto(req, res, next) {
       return res.status(400).json({ ok: false, mensaje: error });
     }
 
-    const { nombre, id_categoria, precio_venta, activo, receta } = req.body;
-    const idNum = Number(id);
+    const idProducto = Number(id);
+    const { nombre, id_categoria, tipo_producto, precio_venta, activo, receta } = req.body;
 
     const actualizado = await withTransaction(async (client) => {
-      const resProd = await client.query(
-        `UPDATE producto
-         SET id_categoria = $1,
-             nombre = $2,
-             precio_venta = $3,
-             activo = COALESCE($4, activo)
-         WHERE id_producto = $5
-         RETURNING *`,
-        [Number(id_categoria), nombre.trim(), precio_venta, activo ?? null, idNum]
+      const actualRes = await client.query(
+        `SELECT id_producto, id_categoria, tipo_producto, nombre, precio_venta, activo
+         FROM producto
+         WHERE id_producto = $1`,
+        [idProducto]
       );
 
-      if (resProd.rows.length === 0) {
+      if (actualRes.rows.length === 0) {
         return null;
       }
 
-      if (Array.isArray(receta)) {
-        await guardarReceta(client, idNum, receta);
+      const actual = actualRes.rows[0];
+      const nuevoNombre = nombre !== undefined ? nombre.trim() : actual.nombre;
+      const nuevaCategoria = id_categoria !== undefined ? Number(id_categoria) : actual.id_categoria;
+      const nuevoTipo = tipo_producto !== undefined ? tipo_producto.trim() : actual.tipo_producto;
+      const nuevoPrecio = precio_venta !== undefined ? precio_venta : actual.precio_venta;
+      const nuevoActivo = activo !== undefined ? activo : actual.activo;
+
+      await client.query(
+        `UPDATE producto
+         SET id_categoria = $1,
+             tipo_producto = $2,
+             nombre = $3,
+             precio_venta = $4,
+             activo = $5
+         WHERE id_producto = $6`,
+        [nuevaCategoria, nuevoTipo, nuevoNombre, nuevoPrecio, nuevoActivo, idProducto]
+      );
+
+      if (receta !== undefined) {
+        await guardarReceta(client, idProducto, receta);
       }
 
-      return resProd.rows[0];
+      const prodRes = await client.query(
+        `SELECT p.id_producto, p.id_categoria, c.nombre AS categoria,
+                p.tipo_producto, p.nombre, p.precio_venta, p.activo
+         FROM producto p
+         JOIN categoria c ON c.id_categoria = p.id_categoria
+         WHERE p.id_producto = $1`,
+        [idProducto]
+      );
+
+      const recetaRes = await client.query(
+        `SELECT rd.id_insumo, i.nombre AS insumo,
+                u.nombre AS unidad_medida, u.abreviatura, rd.cantidad
+         FROM receta_detalle rd
+         JOIN insumo i ON i.id_insumo = rd.id_insumo
+         JOIN unidad_medida u ON u.id_unidad = i.id_unidad
+         WHERE rd.id_producto = $1
+         ORDER BY rd.id_insumo ASC`,
+        [idProducto]
+      );
+
+      return {
+        ...prodRes.rows[0],
+        receta: recetaRes.rows
+      };
     });
 
     if (!actualizado) {
       return res.status(404).json({ ok: false, mensaje: 'Producto no encontrado' });
     }
 
-    const recetaActualizada = await consultarRecetaPorProducto(idNum);
-
-    res.json({
-      ok: true,
-      data: {
-        ...actualizado,
-        receta: recetaActualizada
-      }
-    });
+    res.json({ ok: true, data: actualizado });
   } catch (err) {
     responderErrorBD(err, res, next);
   }
 }
 
 
-// DELETE /api/productos/:id (baja lógica)
+// DELETE /api/productos/:id (eliminación física)
+
 export async function darDeBajaProducto(req, res, next) {
   try {
     const { id } = req.params;
+
     if (!esIdValido(id)) {
-      return res.status(400).json({ ok: false, mensaje: 'El id debe ser un número válido' });
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'El id debe ser un número válido'
+      });
     }
 
-    const resultado = await query(
-      `UPDATE producto
-       SET activo = false
-       WHERE id_producto = $1
-       RETURNING id_producto, activo`,
-      [Number(id)]
-    );
+    const resultado = await withTransaction(async client => {
 
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({ ok: false, mensaje: 'Producto no encontrado' });
+      // Verificar que el producto exista.
+      const producto = await client.query(
+        `SELECT id_producto
+         FROM producto
+         WHERE id_producto = $1
+         FOR UPDATE`,
+        [Number(id)]
+      );
+
+      if (producto.rows.length === 0) {
+        return { noEncontrado: true };
+      }
+
+      // Verificar si tiene ventas asociadas.
+      const ventas = await client.query(
+        `SELECT 1
+         FROM venta_detalle
+         WHERE id_producto = $1
+         LIMIT 1`,
+        [Number(id)]
+      );
+
+      if (ventas.rows.length > 0) {
+        return { tieneVentas: true };
+      }
+
+      // Eliminar la receta asociada.
+      await client.query(
+        `DELETE FROM receta_detalle
+         WHERE id_producto = $1`,
+        [Number(id)]
+      );
+
+      // Eliminar definitivamente el producto.
+      const eliminado = await client.query(
+        `DELETE FROM producto
+         WHERE id_producto = $1
+         RETURNING id_producto, nombre`,
+        [Number(id)]
+      );
+
+      return { eliminado: eliminado.rows[0] };
+    });
+
+    if (resultado.noEncontrado) {
+      return res.status(404).json({
+        ok: false,
+        mensaje: 'Producto no encontrado'
+      });
     }
 
-    res.json({ ok: true, data: resultado.rows[0] });
+    if (resultado.tieneVentas) {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'No se puede eliminar un producto con ventas registradas'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mensaje: 'Producto eliminado correctamente',
+      data: resultado.eliminado
+    });
+
   } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'El producto tiene registros asociados y no puede eliminarse'
+      });
+    }
+
     next(err);
   }
 }
+
 
