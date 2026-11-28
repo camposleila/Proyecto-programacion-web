@@ -346,8 +346,6 @@ export async function darDeBajaProducto(req, res, next) {
 
     }
 
-
-
     const resultado = await query(
 
       `UPDATE producto
