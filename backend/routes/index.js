@@ -12,7 +12,11 @@ import categoriasRoutes from './categorias.routes.js';
 import insumosRoutes from './insumos.routes.js';
 import productosRoutes from './productos.routes.js';
 import inventarioRoutes from './inventario.routes.js';
-
+import planillasRoutes from './planillas.routes.js';
+import parametrosLegalesRoutes from './parametros-legales.routes.js';
+import tramosRentaRoutes from './tramos-renta.routes.js';
+import clientesRoutes from './clientes.routes.js';
+import ventasRoutes from './ventas.routes.js';
 
 const router = Router();
 
@@ -30,10 +34,9 @@ router.use('/categorias', categoriasRoutes);
 router.use('/insumos', insumosRoutes);
 router.use('/productos', productosRoutes);
 router.use('/inventario', inventarioRoutes);
-
-import clientesRoutes from './clientes.routes.js';
-import ventasRoutes from './ventas.routes.js';
-// ...
+router.use('/planillas', planillasRoutes);
+router.use('/parametros-legales', parametrosLegalesRoutes);
+router.use('/tramos-renta', tramosRentaRoutes);
 router.use('/clientes', clientesRoutes);
 router.use('/ventas', ventasRoutes);
 export default router;
