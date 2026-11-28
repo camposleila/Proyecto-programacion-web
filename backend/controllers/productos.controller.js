@@ -332,51 +332,96 @@ export async function actualizarProducto(req, res, next) {
   }
 }
 
-// DELETE /api/productos/:id (baja lógica)
+
+// DELETE /api/productos/:id (eliminación física)
 
 export async function darDeBajaProducto(req, res, next) {
-
   try {
-
     const { id } = req.params;
 
     if (!esIdValido(id)) {
-
-      return res.status(400).json({ ok: false, mensaje: 'El id debe ser un número válido' });
-
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'El id debe ser un número válido'
+      });
     }
 
-    const resultado = await query(
+    const resultado = await withTransaction(async client => {
 
-      `UPDATE producto
+      // Verificar que el producto exista.
+      const producto = await client.query(
+        `SELECT id_producto
+         FROM producto
+         WHERE id_producto = $1
+         FOR UPDATE`,
+        [Number(id)]
+      );
 
-       SET activo = false
+      if (producto.rows.length === 0) {
+        return { noEncontrado: true };
+      }
 
-       WHERE id_producto = $1
+      // Verificar si tiene ventas asociadas.
+      const ventas = await client.query(
+        `SELECT 1
+         FROM venta_detalle
+         WHERE id_producto = $1
+         LIMIT 1`,
+        [Number(id)]
+      );
 
-       RETURNING id_producto, activo`,
+      if (ventas.rows.length > 0) {
+        return { tieneVentas: true };
+      }
 
-      [Number(id)]
+      // Eliminar la receta asociada.
+      await client.query(
+        `DELETE FROM receta_detalle
+         WHERE id_producto = $1`,
+        [Number(id)]
+      );
 
-    );
+      // Eliminar definitivamente el producto.
+      const eliminado = await client.query(
+        `DELETE FROM producto
+         WHERE id_producto = $1
+         RETURNING id_producto, nombre`,
+        [Number(id)]
+      );
 
+      return { eliminado: eliminado.rows[0] };
+    });
 
-
-    if (resultado.rows.length === 0) {
-
-      return res.status(404).json({ ok: false, mensaje: 'Producto no encontrado' });
-
+    if (resultado.noEncontrado) {
+      return res.status(404).json({
+        ok: false,
+        mensaje: 'Producto no encontrado'
+      });
     }
 
+    if (resultado.tieneVentas) {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'No se puede eliminar un producto con ventas registradas'
+      });
+    }
 
-
-    res.json({ ok: true, data: resultado.rows[0] });
+    return res.json({
+      ok: true,
+      mensaje: 'Producto eliminado correctamente',
+      data: resultado.eliminado
+    });
 
   } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'El producto tiene registros asociados y no puede eliminarse'
+      });
+    }
 
     next(err);
-
   }
-
 }
+
 

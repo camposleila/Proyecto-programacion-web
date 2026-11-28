@@ -58,3 +58,25 @@ export async function listarCategorias() {
     nombre: c.nombre
   }));
 }
+
+// Funciones para la administración de productos
+
+export async function listarProductosInventario() {
+  return desempaquetar(await api.get('/productos'));
+}
+
+export async function obtenerProducto(id) {
+  return desempaquetar(await api.get(`/productos/${id}`));
+}
+
+export async function crearProducto(producto) {
+  return desempaquetar(await api.post('/productos', producto));
+}
+
+export async function actualizarProducto(id, producto) {
+  return desempaquetar(await api.put(`/productos/${id}`, producto));
+}
+
+export async function eliminarProducto(id) {
+  return desempaquetar(await api.delete(`/productos/${id}`));
+}
