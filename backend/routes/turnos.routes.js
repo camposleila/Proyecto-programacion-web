@@ -308,4 +308,83 @@ router.post('/:id/cerrar', permitirRoles('Administrador', 'Gerente', 'Cajero'), 
     }
 });
 
+// Listar cajas activas de la sucursal (para el <select> de abrir turno)
+router.get('/cajas', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
+    try {
+        const params = [];
+        let where = 'WHERE s.activa = TRUE';
+
+        if (req.usuario.id_sucursal && req.usuario.rol !== 'Administrador') {
+            params.push(req.usuario.id_sucursal);
+            where += ` AND c.id_sucursal = $${params.length}`;
+        }
+
+        const resultado = await pool.query(
+            `SELECT c.id_caja, c.nombre, c.id_sucursal, s.nombre AS nombre_sucursal
+             FROM caja c
+             INNER JOIN sucursal s ON s.id_sucursal = c.id_sucursal
+             ${where}
+             ORDER BY c.id_caja ASC`,
+            params
+        );
+
+        return res.json({ cajas: resultado.rows });
+    } catch (error) {
+        console.error('Error al listar cajas:', error);
+        return res.status(500).json({ ok: false, mensaje: 'No se pudieron consultar las cajas' });
+    }
+});
+
+// Historial de turnos cerrados (para la pestaña Historial de cierres)
+router.get('/', permitirRoles('Administrador', 'Gerente', 'Cajero'), async (req, res) => {
+    const sucursalQuery = validarId(req.query.id_sucursal);
+
+    try {
+        const params = [];
+        const condiciones = [`tc.estado = 'CERRADO'`];
+
+        if (req.usuario.rol !== 'Administrador') {
+            if (req.usuario.id_sucursal) {
+                params.push(req.usuario.id_sucursal);
+                condiciones.push(`c.id_sucursal = $${params.length}`);
+            }
+        } else if (sucursalQuery) {
+            params.push(sucursalQuery);
+            condiciones.push(`c.id_sucursal = $${params.length}`);
+        }
+
+        const resultado = await pool.query(
+            `SELECT tc.id_turno,
+                    tc.id_caja,
+                    tc.id_usuario,
+                    tc.fecha_apertura,
+                    tc.monto_apertura,
+                    tc.fecha_cierre,
+                    tc.estado,
+                    c.nombre AS nombre_caja,
+                    c.id_sucursal,
+                    s.nombre AS nombre_sucursal,
+                    u.nombre_usuario,
+                    COALESCE(SUM(ccd.monto_esperado), 0)::numeric(12,2) AS total_esperado,
+                    COALESCE(SUM(ccd.monto_contado), 0)::numeric(12,2) AS total_contado,
+                    COALESCE(SUM(ccd.diferencia), 0)::numeric(12,2) AS diferencia_total
+             FROM turno_caja tc
+             INNER JOIN caja c ON c.id_caja = tc.id_caja
+             INNER JOIN sucursal s ON s.id_sucursal = c.id_sucursal
+             INNER JOIN usuario u ON u.id_usuario = tc.id_usuario
+             LEFT JOIN cierre_caja_detalle ccd ON ccd.id_turno = tc.id_turno
+             WHERE ${condiciones.join(' AND ')}
+             GROUP BY tc.id_turno, c.nombre, c.id_sucursal, s.nombre, u.nombre_usuario
+             ORDER BY tc.fecha_cierre DESC
+             LIMIT 50`,
+            params
+        );
+
+        return res.json({ turnos: resultado.rows });
+    } catch (error) {
+        console.error('Error al consultar historial de turnos:', error);
+        return res.status(500).json({ ok: false, mensaje: 'No se pudo consultar el historial' });
+    }
+});
+
 export default router;
