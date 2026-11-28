@@ -1,13 +1,16 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, Search, Pencil, Trash2, RefreshCw } from 'lucide-react';
-
+import TablaExistencias from '../components/inventario/TablaExistencias.jsx';
 import Tabla from '../components/ui/Tabla.jsx';
 import Paginacion from '../components/ui/Paginacion.jsx';
 import CampoFormulario from '../components/ui/CampoFormulario.jsx';
-
+import { useSearchParams } from 'react-router-dom';
+import FormularioProducto from '../components/inventario/FormularioProducto.jsx';
+import { getUsuario } from '../utils/sesion';
 import {
-  listarProductosInventario
+  listarProductosInventario,
+  eliminarProducto
 } from '../services/productosService';
 
 const REGISTROS_POR_PAGINA = 10;
@@ -21,7 +24,55 @@ export default function InventarioPage() {
   const [pagina, setPagina] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [mensaje, setMensaje] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  const puedeEditar = ['Administrador', 'Gerente']
+    .includes(getUsuario().rol);
+  function abrirNuevoProducto() {
+    setProductoSeleccionado(null);
+    setModalAbierto(true);
+  }
+
+  function abrirEdicion(producto) {
+    setProductoSeleccionado(producto.id_producto);
+    setModalAbierto(true);
+  }
+
+  function cerrarFormulario() {
+    setModalAbierto(false);
+    setProductoSeleccionado(null);
+
+    setSearchParams(anterior => {
+      const parametros = new URLSearchParams(anterior);
+      parametros.delete('producto');
+      return parametros;
+    }, { replace: true });
+  }
+
+  async function productoGuardado() {
+    cerrarFormulario();
+    setMensaje('Producto guardado correctamente.');
+    await cargarProductos();
+  }
+
+  async function darDeBaja(producto) {
+    const confirmar = window.confirm(
+      `¿Deseás dar de baja ${producto.nombre}?`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      await eliminarProducto(producto.id_producto);
+      setMensaje('Producto dado de baja correctamente.');
+      await cargarProductos();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
   async function cargarProductos() {
     try {
       setCargando(true);
@@ -46,6 +97,15 @@ export default function InventarioPage() {
   useEffect(() => {
     cargarProductos();
   }, []);
+  useEffect(() => {
+    const id = Number(searchParams.get('producto'));
+
+    if (puedeEditar && Number.isInteger(id) && id > 0) {
+      setPestana('productos');
+      setProductoSeleccionado(id);
+      setModalAbierto(true);
+    }
+  }, [searchParams, puedeEditar]);
 
   const productosFiltrados = productos.filter((producto) => {
 
@@ -83,6 +143,16 @@ export default function InventarioPage() {
       titulo: 'Categoría'
     },
     {
+      campo: 'tipo_producto',
+      titulo: 'Tipo',
+      render: (producto) =>
+        producto.tipo_producto === 'ELABORADO'
+          ? 'Elaborado'
+          : producto.tipo_producto === 'REVENTA'
+            ? 'Reventa'
+            : '—'
+    },
+    {
       campo: 'precio_venta',
       titulo: 'Precio',
       render: (producto) =>
@@ -92,11 +162,10 @@ export default function InventarioPage() {
       campo: 'activo',
       titulo: 'Estado',
       render: (producto) => (
-        <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-          producto.activo
-            ? 'bg-green-100 text-green-700'
-            : 'bg-red-100 text-red-700'
-        }`}>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium ${producto.activo
+          ? 'bg-green-100 text-green-700'
+          : 'bg-red-100 text-red-700'
+          }`}>
           {producto.activo ? 'Activo' : 'Inactivo'}
         </span>
       )
@@ -104,14 +173,15 @@ export default function InventarioPage() {
     {
       campo: 'acciones',
       titulo: 'Acciones',
-      render: (producto) => (
+      render: (producto) => puedeEditar ? (
         <div className="flex items-center gap-2">
+
           <button
             type="button"
             className="rounded-lg p-2 hover:bg-celeste/40"
             title="Editar producto"
             aria-label={`Editar ${producto.nombre}`}
-            onClick={() => console.log('Editar:', producto)}
+            onClick={() => abrirEdicion(producto)}
           >
             <Pencil size={18} />
           </button>
@@ -122,13 +192,14 @@ export default function InventarioPage() {
               className="rounded-lg p-2 text-red-600 hover:bg-red-100"
               title="Dar de baja"
               aria-label={`Dar de baja ${producto.nombre}`}
-              onClick={() => console.log('Dar de baja:', producto)}
+              onClick={() => darDeBaja(producto)}
             >
               <Trash2 size={18} />
             </button>
           )}
+
         </div>
-      )
+      ) : '—'
     }
   ];
 
@@ -149,7 +220,18 @@ export default function InventarioPage() {
           Administración de productos, recetas y existencias.
         </p>
       </div>
+      {mensaje && (
+        <div className="flex items-center justify-between rounded-lg bg-green-100 p-3 text-sm text-green-700">
+          <span>{mensaje}</span>
 
+          <button
+            type="button"
+            onClick={() => setMensaje('')}
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
       {/* Pestañas de navegación */}
       <div className="flex flex-wrap gap-2 border-b border-oliva/30 pb-3">
         {pestanas.map((item) => (
@@ -177,14 +259,16 @@ export default function InventarioPage() {
               Gestión de productos
             </h2>
 
-            <button
-              type="button"
-              className="btn-oscuro flex items-center gap-2"
-              onClick={() => console.log('Nuevo producto')}
-            >
-              <Plus size={18} />
-              Nuevo producto
-            </button>
+            {puedeEditar && (
+              <button
+                type="button"
+                className="btn-oscuro flex items-center gap-2"
+                onClick={abrirNuevoProducto}
+              >
+                <Plus size={18} />
+                Nuevo producto
+              </button>
+            )}
           </div>
 
           {/* Indicadores */}
@@ -307,15 +391,8 @@ export default function InventarioPage() {
       )}
 
       {pestana === 'existencias' && (
-        <section className="rounded-xl border border-oliva/30 p-8">
-          <h2 className="text-xl font-bold">
-            Existencias por sucursal
-          </h2>
-          <p className="mt-2 text-oliva">
-            Módulo en desarrollo.
-          </p>
-        </section>
-      )}
+  <TablaExistencias />
+)}
 
       {pestana === 'movimientos' && (
         <section className="rounded-xl border border-oliva/30 p-8">
@@ -327,7 +404,14 @@ export default function InventarioPage() {
           </p>
         </section>
       )}
-
+      {modalAbierto && puedeEditar && (
+        <FormularioProducto
+          key={productoSeleccionado ?? 'nuevo'}
+          idProducto={productoSeleccionado}
+          onCerrar={cerrarFormulario}
+          onGuardado={productoGuardado}
+        />
+      )}
     </div>
   );
 }
