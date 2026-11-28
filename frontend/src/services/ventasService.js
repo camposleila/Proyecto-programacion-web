@@ -94,3 +94,23 @@ export async function crearVenta(payload, contexto = {}) {
 export async function obtenerVenta(id) {
   return normalizarVenta(desempaquetar(await api.get(`/ventas/${id}`)));
 }
+
+export async function listarVentasResumen(idSucursal = '', fechaDesde = '') {
+  const parametros = new URLSearchParams({
+    estado: 'EMITIDA'
+  });
+
+  if (idSucursal) {
+    parametros.set('id_sucursal', idSucursal);
+  }
+
+  if (fechaDesde) {
+    parametros.set('fecha_desde', fechaDesde);
+  }
+
+  const respuesta = await api.get(
+    `/ventas?${parametros.toString()}`
+  );
+
+  return respuesta.data ?? respuesta;
+}
